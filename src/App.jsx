@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import './App.css'
-import SketchCanvas from './components/SketchCanvas'
-import constants from './constants'
-import Menu from './components/Menu';
-import GameOver from './components/GameOver';
-import Countdown from './components/Countdown';
+import { useCallback, useEffect, useRef, useState } from "react";
+import "./App.css";
+import SketchCanvas from "./components/SketchCanvas";
+import constants from "./constants";
+import Menu from "./components/Menu";
+import GameOver from "./components/GameOver";
+import Countdown from "./components/Countdown";
 
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from "framer-motion";
 
 const formatTime = (seconds) => {
   seconds = Math.floor(seconds);
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-}
+  return `${minutes.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}`;
+};
 
 // https://stackoverflow.com/a/12646864/13989043
 function shuffleArray(array) {
@@ -24,12 +26,11 @@ function shuffleArray(array) {
 }
 
 function App() {
-
   // Model loading
   const [ready, setReady] = useState(false);
 
   // Game state
-  const [gameState, setGameState] = useState('menu');
+  const [gameState, setGameState] = useState("menu");
   const [countdown, setCountdown] = useState(constants.COUNTDOWN_TIMER);
   const [gameCurrentTime, setGameCurrentTime] = useState(null);
   const [gameStartTime, setGameStartTime] = useState(null);
@@ -49,8 +50,8 @@ function App() {
   useEffect(() => {
     if (!worker.current) {
       // Create the worker if it does not yet exist.
-      worker.current = new Worker(new URL('./worker.js', import.meta.url), {
-        type: 'module'
+      worker.current = new Worker(new URL("./worker.js", import.meta.url), {
+        type: "module",
       });
     }
 
@@ -59,34 +60,41 @@ function App() {
       const result = e.data;
 
       switch (result.status) {
-
-        case 'ready':
+        case "ready":
           // Pipeline ready: the worker is ready to accept messages.
           setReady(true);
           beginCountdown();
           break;
 
-        case 'update':
+        case "update":
           // Generation update: update the output text.
           break;
 
-        case 'result':
+        case "result":
           // TODO optimize:
 
           setIsPredicting(false);
 
           {
-            const filteredResult = result.data.filter(x => !constants.BANNED_LABELS.includes(x.label));
+            const filteredResult = result.data.filter(
+              (x) => !constants.BANNED_LABELS.includes(x.label)
+            );
             const timespent = canvasRef.current.getTimeSpentDrawing();
 
             // Slowly start rejecting labels that are not the target
             const applyEasyMode = timespent - constants.REJECT_TIME_DELAY;
-            if (applyEasyMode > 0 && filteredResult[0].score > constants.START_REJECT_THRESHOLD) {
-
+            if (
+              applyEasyMode > 0 &&
+              filteredResult[0].score > constants.START_REJECT_THRESHOLD
+            ) {
               // The number of labels to reject
               let amount = applyEasyMode / constants.REJECT_TIME_PER_LABEL;
 
-              for (let i = 0; i < filteredResult.length && i < amount + 1; ++i) {
+              for (
+                let i = 0;
+                i < filteredResult.length && i < amount + 1;
+                ++i
+              ) {
                 if (filteredResult[i].label === targets[targetIndex]) {
                   // The target label should not be rejected
                   continue;
@@ -95,7 +103,7 @@ function App() {
                   filteredResult[i].score = 0;
                 } else {
                   // fractional amount
-                  filteredResult[i].score *= (i - amount);
+                  filteredResult[i].score *= i - amount;
                 }
               }
 
@@ -105,7 +113,7 @@ function App() {
 
             // Normalize to be a probability distribution
             const sum = filteredResult.reduce((acc, x) => acc + x.score, 0);
-            filteredResult.forEach(x => x.score /= sum);
+            filteredResult.forEach((x) => (x.score /= sum));
 
             setOutput(filteredResult);
           }
@@ -114,11 +122,12 @@ function App() {
     };
 
     // Attach the callback function as an event listener.
-    worker.current.addEventListener('message', onMessageReceived);
+    worker.current.addEventListener("message", onMessageReceived);
     // worker.current.addEventListener('error', alert);
 
     // Define a cleanup function for when the component is unmounted.
-    return () => worker.current.removeEventListener('message', onMessageReceived);
+    return () =>
+      worker.current.removeEventListener("message", onMessageReceived);
   });
 
   // Set up classify function
@@ -127,7 +136,7 @@ function App() {
       const image = canvasRef.current.getCanvasData();
       if (image !== null) {
         setIsPredicting(true);
-        worker.current.postMessage({ action: 'classify', image })
+        worker.current.postMessage({ action: "classify", image });
       }
     }
   }, []);
@@ -145,21 +154,22 @@ function App() {
   };
 
   const beginCountdown = () => {
-    setGameState('countdown');
+    setGameState("countdown");
 
     // Choose the targets here and shuffle
-    const possibleLabels = Object.values(constants.LABELS)
-      .filter(x => !constants.BANNED_LABELS.includes(x));
+    const possibleLabels = Object.values(constants.LABELS).filter(
+      (x) => !constants.BANNED_LABELS.includes(x)
+    );
     shuffleArray(possibleLabels);
 
     setTargets(possibleLabels);
     setTargetIndex(0);
-  }
+  };
 
   const handleMainClick = () => {
     if (!ready) {
-      setGameState('loading');
-      worker.current.postMessage({ action: 'load' })
+      setGameState("loading");
+      worker.current.postMessage({ action: "load" });
     } else {
       beginCountdown();
     }
@@ -175,65 +185,81 @@ function App() {
 
   // Detect for start of game
   useEffect(() => {
-    if (gameState === 'countdown' && countdown <= 0) {
+    if (gameState === "countdown" && countdown <= 0) {
       setGameStartTime(performance.now());
       setPredictions([]);
-      setGameState('playing');
+      setGameState("playing");
     }
-  }, [gameState, countdown])
+  }, [gameState, countdown]);
 
-  const addPrediction = useCallback((isCorrect) => {
-    // take snapshot of canvas
-    const image = canvasRef.current.getCanvasData();
+  const addPrediction = useCallback(
+    (isCorrect) => {
+      // take snapshot of canvas
+      const image = canvasRef.current.getCanvasData();
 
-    setPredictions(prev => [...prev, {
-      output: output?.[0] ?? null,
-      image: image,
-      correct: isCorrect,
-      target: targets[targetIndex],
-    }]);
-  }, [output, targetIndex, targets]);
+      setPredictions((prev) => [
+        ...prev,
+        {
+          output: output?.[0] ?? null,
+          image: image,
+          correct: isCorrect,
+          target: targets[targetIndex],
+        },
+      ]);
+    },
+    [output, targetIndex, targets]
+  );
 
-  const endGame = useCallback((cancelled = false) => {
-    if (!cancelled) {
-      addPrediction(false);
-    }
+  const endGame = useCallback(
+    (cancelled = false) => {
+      if (!cancelled) {
+        addPrediction(false);
+      }
 
-    // reset
-    setGameStartTime(null);
-    setOutput(null);
-    setSketchHasChanged(false);
-    handleClearCanvas(true);
-    setCountdown(constants.COUNTDOWN_TIMER);
-    setGameState(cancelled ? 'menu' : 'end');
-  }, [addPrediction]);
+      // reset
+      setGameStartTime(null);
+      setOutput(null);
+      setSketchHasChanged(false);
+      handleClearCanvas(true);
+      setCountdown(constants.COUNTDOWN_TIMER);
+      setGameState(cancelled ? "menu" : "end");
+    },
+    [addPrediction]
+  );
 
   // Detect for end of game
   useEffect(() => {
-    if (gameState === 'playing' && gameCurrentTime !== null && gameStartTime !== null && (gameCurrentTime - gameStartTime) / 1000 > constants.GAME_DURATION) {
+    if (
+      gameState === "playing" &&
+      gameCurrentTime !== null &&
+      gameStartTime !== null &&
+      (gameCurrentTime - gameStartTime) / 1000 > constants.GAME_DURATION
+    ) {
       endGame();
     }
-  }, [endGame, gameState, gameStartTime, gameCurrentTime])
+  }, [endGame, gameState, gameStartTime, gameCurrentTime]);
 
+  const goNext = useCallback(
+    (isCorrect = false) => {
+      if (!isCorrect) {
+        // apply skip penalty (done by pretending the game started earlier)
+        setGameStartTime((prev) => {
+          return prev - constants.SKIP_PENALTY;
+        });
+      }
+      addPrediction(isCorrect);
 
-  const goNext = useCallback((isCorrect = false) => {
-    if (!isCorrect) {
-      // apply skip penalty (done by pretending the game started earlier)
-      setGameStartTime(prev => {
-        return prev - constants.SKIP_PENALTY
-      });
-    }
-    addPrediction(isCorrect);
-
-    setTargetIndex(prev => prev + 1);
-    setOutput(null);
-    setSketchHasChanged(false);
-    handleClearCanvas(true);
-  }, [addPrediction])
+      setTargetIndex((prev) => prev + 1);
+      setOutput(null);
+      setSketchHasChanged(false);
+      handleClearCanvas(true);
+    },
+    [addPrediction]
+  );
 
   // detect for correct and go onto next
   useEffect(() => {
-    if (gameState === 'playing' && output !== null && targets !== null) {
+    if (gameState === "playing" && output !== null && targets !== null) {
       // console.log(targets[targetIndex], output[0])
 
       if (targets[targetIndex] === output[0].label) {
@@ -245,7 +271,7 @@ function App() {
 
   // GAME LOOP:
   useEffect(() => {
-    if (gameState === 'countdown') {
+    if (gameState === "countdown") {
       const countdownTimer = setInterval(() => {
         setCountdown((prevCount) => prevCount - 1);
       }, 1000);
@@ -253,8 +279,7 @@ function App() {
       return () => {
         clearInterval(countdownTimer);
       };
-    } else if (gameState === 'playing') {
-
+    } else if (gameState === "playing") {
       const classifyTimer = setInterval(() => {
         if (sketchHasChanged) {
           !isPredicting && classify();
@@ -267,75 +292,80 @@ function App() {
       return () => {
         clearInterval(classifyTimer);
       };
-    } else if (gameState === 'end') {
+    } else if (gameState === "end") {
       // The game ended naturally (after timer expired)
       handleClearCanvas(true);
     }
   }, [gameState, isPredicting, sketchHasChanged, addPrediction, classify]);
 
   useEffect(() => {
-    if (gameState === 'playing') {
+    if (gameState === "playing") {
       const preventDefault = (e) => e.preventDefault();
-      document.addEventListener('touchmove', preventDefault, { passive: false });
+      document.addEventListener("touchmove", preventDefault, {
+        passive: false,
+      });
       return () => {
-        document.removeEventListener('touchmove', preventDefault, { passive: false });
-      }
+        document.removeEventListener("touchmove", preventDefault, {
+          passive: false,
+        });
+      };
     }
   }, [gameState]);
-  const menuVisible = gameState === 'menu' || gameState === 'loading';
-  const isPlaying = gameState === 'playing';
-  const countdownVisible = gameState === 'countdown';
-  const gameOver = gameState === 'end';
+  const menuVisible = gameState === "menu" || gameState === "loading";
+  const isPlaying = gameState === "playing";
+  const countdownVisible = gameState === "countdown";
+  const gameOver = gameState === "end";
   return (
     <>
-      <div className={`h-full w-full top-0 left-0 absolute ${isPlaying ? '' : 'pointer-events-none'}`}>
-        <SketchCanvas onSketchChange={() => {
-          setSketchHasChanged(true);
-        }} ref={canvasRef} />
-      </div>
-      <AnimatePresence
-        initial={false}
-        mode='wait'
+      <div
+        className={`h-full w-full top-0 left-0 absolute ${
+          isPlaying ? "" : "pointer-events-none"
+        }`}
       >
+        <SketchCanvas
+          onSketchChange={() => {
+            setSketchHasChanged(true);
+          }}
+          ref={canvasRef}
+        />
+      </div>
+      <AnimatePresence initial={false} mode="wait">
         {menuVisible && (
           <Menu gameState={gameState} onClick={handleMainClick} />
         )}
       </AnimatePresence>
 
-      <AnimatePresence
-        initial={false}
-        mode='wait'
-      >
-        {countdownVisible && (
-          <Countdown countdown={countdown} />
-        )}
+      <AnimatePresence initial={false} mode="wait">
+        {countdownVisible && <Countdown countdown={countdown} />}
       </AnimatePresence>
 
-      <AnimatePresence
-        initial={false}
-        mode='wait'
-      >
+      <AnimatePresence initial={false} mode="wait">
         {gameOver && (
           <GameOver predictions={predictions} onClick={handleGameOverClick} />
         )}
       </AnimatePresence>
 
-      {((isPlaying && gameCurrentTime !== null && targets)) && (
-
-        <div className='absolute top-5 text-center'>
-          <h2 className='text-4xl'>Draw &quot;{targets[targetIndex]}&quot;</h2>
-          <h3 className='text-2xl'>
-            {formatTime(Math.max(constants.GAME_DURATION - (gameCurrentTime - gameStartTime) / 1000, 0))}
+      {isPlaying && gameCurrentTime !== null && targets && (
+        <div className="absolute top-5 text-center">
+          <h2 className="text-4xl">Draw &quot;{targets[targetIndex]}&quot;</h2>
+          <h3 className="text-2xl">
+            {formatTime(
+              Math.max(
+                constants.GAME_DURATION -
+                  (gameCurrentTime - gameStartTime) / 1000,
+                0
+              )
+            )}
           </h3>
         </div>
       )}
 
       {menuVisible && (
-        <div className='absolute bottom-4'>
+        <div className="absolute bottom-4">
           Made with{" "}
           <a
-            className='underline'
-            href='https://github.com/xenova/transformers.js'
+            className="underline"
+            href="https://github.com/xenova/transformers.js"
           >
             🤗 Transformers.js
           </a>
@@ -343,21 +373,41 @@ function App() {
       )}
 
       {isPlaying && (
-        <div className='absolute bottom-5 text-center'>
-
+        <div className="absolute bottom-12 text-center md:bottom-5">
           <h1 className="text-2xl font-bold mb-3">
-            {output && `Prediction: ${output[0].label} (${(100 * output[0].score).toFixed(1)}%)`}
+            {output &&
+              `Prediction: ${output[0].label} (${(
+                100 * output[0].score
+              ).toFixed(1)}%)`}
           </h1>
 
-          <div className='flex gap-2 justify-center'>
-            <button onClick={() => { handleClearCanvas() }}>Clear</button>
-            <button onClick={() => { goNext(false) }}>Skip</button>
-            <button onClick={() => { handleEndGame(true) }}>Exit</button>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={() => {
+                handleClearCanvas();
+              }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => {
+                goNext(false);
+              }}
+            >
+              Skip
+            </button>
+            <button
+              onClick={() => {
+                handleEndGame(true);
+              }}
+            >
+              Exit
+            </button>
           </div>
         </div>
       )}
     </>
-  )
+  );
 }
 
-export default App
+export default App;
